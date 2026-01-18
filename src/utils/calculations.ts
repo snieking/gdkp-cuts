@@ -93,7 +93,7 @@ export function formatGold(amount: number): string {
 }
 
 export function generateGargulExport(playerCuts: PlayerCut[]): string {
-  return playerCuts
-    .map((p) => `${p.name},${Math.round(p.totalCut)}`)
-    .join('\n');
+  const header = 'Player,Gold';
+  const rows = playerCuts.map((p) => `${p.name},${Math.round(p.totalCut)}`);
+  return [header, ...rows].join('\n');
 }
