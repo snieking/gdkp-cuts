@@ -56,7 +56,7 @@ export function DeductionsPanel({ deductions, players, totalDeducted, onAdd, onR
             className="w-full rounded-md bg-gray-700 border-gray-600 text-white text-sm px-2 py-1.5 border"
           >
             <option value="">-- Select --</option>
-            {players.map((p) => (
+            {[...players].sort((a, b) => a.name.localeCompare(b.name)).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>

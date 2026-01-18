@@ -92,7 +92,7 @@ export function BonusTable({ assignments, players, totalPot, raidType, onAssignm
                               className="flex-1 rounded-md bg-gray-700 border-gray-600 text-white text-sm px-2 py-1 border focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="">-- Select --</option>
-                              {players.map((p) => (
+                              {[...players].sort((a, b) => a.name.localeCompare(b.name)).map((p) => (
                                 <option key={p.id} value={p.id}>
                                   {p.name}
                                 </option>
