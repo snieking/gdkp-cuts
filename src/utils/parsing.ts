@@ -125,6 +125,10 @@ export function autoDetectBonuses(reportData: ReportData): BonusAssignment[] {
           case 'topDecurse':
             castData = reportData.castsDecurse;
             break;
+          case 'wlTank1':
+          case 'wlTank2':
+            castData = reportData.castsSearingPain;
+            break;
         }
 
         if (castData.length > 0) {

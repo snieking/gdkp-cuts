@@ -124,6 +124,13 @@ export async function fetchReportData(code: string): Promise<ReportData> {
     castsCurseElementsResult,
     castsRemoveLesserCurseResult,
     castsRemoveCurseResult,
+    // Searing Pain - Warlock tank (all ranks)
+    castsSearingPain1Result,
+    castsSearingPain2Result,
+    castsSearingPain3Result,
+    castsSearingPain4Result,
+    castsSearingPain5Result,
+    castsSearingPain6Result,
   ] = await Promise.all([
     graphqlRequest<{ reportData: { report: { table: { data: { entries: RankingEntry[] } } } } }>(
       GET_DAMAGE_DONE,
@@ -170,6 +177,13 @@ export async function fetchReportData(code: string): Promise<ReportData> {
     // Decurse abilities
     fetchCastsByTime(SPELL_IDS.REMOVE_LESSER_CURSE),
     fetchCastsByTime(SPELL_IDS.REMOVE_CURSE),
+    // Searing Pain - Warlock tank (all ranks)
+    fetchCastsByTime(SPELL_IDS.SEARING_PAIN_1),
+    fetchCastsByTime(SPELL_IDS.SEARING_PAIN_2),
+    fetchCastsByTime(SPELL_IDS.SEARING_PAIN_3),
+    fetchCastsByTime(SPELL_IDS.SEARING_PAIN_4),
+    fetchCastsByTime(SPELL_IDS.SEARING_PAIN_5),
+    fetchCastsByTime(SPELL_IDS.SEARING_PAIN_6),
   ]);
 
   // Helper to merge cast entries (combine regular + greater blessings)
@@ -244,5 +258,13 @@ export async function fetchReportData(code: string): Promise<ReportData> {
     castsCurseRecklessness: castsCurseRecklessnessResult.reportData.report.table?.data?.entries || [],
     castsCurseElements: castsCurseElementsResult.reportData.report.table?.data?.entries || [],
     castsDecurse: mergeCasts(castsRemoveLesserCurseResult, castsRemoveCurseResult),
+    castsSearingPain: mergeCasts(
+      castsSearingPain1Result,
+      castsSearingPain2Result,
+      castsSearingPain3Result,
+      castsSearingPain4Result,
+      castsSearingPain5Result,
+      castsSearingPain6Result
+    ),
   };
 }

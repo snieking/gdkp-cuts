@@ -150,8 +150,8 @@ export const WORLD_TOUR_BONUS_DEFINITIONS: BonusDefinition[] = [
   { id: 'curseElements', name: 'CoE', percentage: 0.40, category: 'debuff', detectionMethod: 'cast', rank: 1 },
 
   // Utility - World Tour specific (no Priest MC, no Top Decurse)
-  { id: 'wlTank1', name: 'WL Tank 1', percentage: 0.15, category: 'utility', detectionMethod: 'manual' },
-  { id: 'wlTank2', name: 'WL Tank 2', percentage: 0.15, category: 'utility', detectionMethod: 'manual' },
+  { id: 'wlTank1', name: 'WL Tank 1', percentage: 0.15, category: 'utility', detectionMethod: 'cast', rank: 1 },
+  { id: 'wlTank2', name: 'WL Tank 2', percentage: 0.15, category: 'utility', detectionMethod: 'cast', rank: 2 },
   { id: 'kings', name: 'Kings', percentage: 0.20, category: 'utility', detectionMethod: 'cast', rank: 1 },
   { id: 'mightWisdom', name: 'Might + Wisdom', percentage: 0.20, category: 'utility', detectionMethod: 'cast', rank: 1 },
   { id: 'salvation', name: 'Salvation', percentage: 0.25, category: 'utility', detectionMethod: 'cast', rank: 1 },
@@ -230,6 +230,7 @@ export interface ReportData {
   castsCurseRecklessness: CastEntry[];
   castsCurseElements: CastEntry[];
   castsDecurse: CastEntry[]; // Remove Lesser Curse + Remove Curse
+  castsSearingPain: CastEntry[]; // Warlock tank detection
 }
 
 export interface AuthState {
@@ -262,6 +263,13 @@ export const SPELL_IDS = {
   // Decurse abilities
   REMOVE_LESSER_CURSE: 475,  // Mage
   REMOVE_CURSE: 2782,        // Druid
+  // Searing Pain (Warlock tank ability) - all ranks
+  SEARING_PAIN_1: 5676,
+  SEARING_PAIN_2: 17919,
+  SEARING_PAIN_3: 17920,
+  SEARING_PAIN_4: 17921,
+  SEARING_PAIN_5: 17922,
+  SEARING_PAIN_6: 17923,
 };
 
 export const NAXXRAMAS_ZONE_ID = 533;
