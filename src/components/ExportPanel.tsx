@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PlayerCut, Config, BonusAssignment, Deduction, BONUS_DEFINITIONS } from '../types';
-import { generateGargulExport, formatGold, CalculationResult } from '../utils/calculations';
+import { generateGargulExport, CalculationResult } from '../utils/calculations';
 
 interface Props {
   playerCuts: PlayerCut[];
@@ -24,48 +24,97 @@ export function ExportPanel({ playerCuts, config, assignments, deductions, repor
     setTimeout(() => setCopiedGargul(false), 2000);
   };
 
-  // Generate Google Sheets compatible TSV
+  // Generate Google Sheets compatible TSV (multi-column layout)
   const generateSheetExport = () => {
-    const lines: string[] = [];
+    const avgCut = playerCuts.length > 0
+      ? playerCuts.reduce((sum, p) => sum + p.totalCut, 0) / playerCuts.length
+      : 0;
 
-    // Summary section
-    lines.push(`Total Pot\t${config.totalPot}`);
-    lines.push(`Organizer Cut\t${config.organizerCutPercent}%\t${formatGold(config.totalPot * config.organizerCutPercent / 100)}`);
-    lines.push(`Gold to Distribute\t${100 - config.organizerCutPercent}%\t${formatGold(result.goldToDistribute)}`);
-    lines.push(`Bonuses\t${config.bonusPoolPercent}%\t${formatGold(result.bonusPool)}`);
-    lines.push(`Even Split\t${100 - config.organizerCutPercent - config.bonusPoolPercent}%\t${formatGold(result.evenSplitPool)}`);
-    lines.push(`Players\t${config.playerCount}`);
-    lines.push(`Base Cut\t${formatGold(result.baseCut)}`);
-    lines.push('');
+    // Build summary column (A-C)
+    const summaryRows: string[][] = [
+      ['Total Pot', '100.00%', String(config.totalPot)],
+      ['Organizer Cut', `${config.organizerCutPercent}%`, String(Math.round(config.totalPot * config.organizerCutPercent / 100))],
+      ['Gold to distribute', `${100 - config.organizerCutPercent}.00%`, String(Math.round(result.goldToDistribute))],
+      ['Bonuses', `${config.bonusPoolPercent}.00%`, String(Math.round(result.bonusPool))],
+      ['Even Split', `${100 - config.organizerCutPercent - config.bonusPoolPercent}.00%`, String(Math.round(result.evenSplitPool))],
+      ['Amount of players in Raid', '', String(config.playerCount)],
+      ['Base cut', '', String(Math.round(result.baseCut))],
+      ['Base cut with bonus', '', String(Math.round(result.baseCut))],
+      ['Avg cut', '', String(Math.round(avgCut))],
+      ['', '', ''],
+      ['Deductions', '%', 'Amount', 'Total Cut'],
+    ];
 
-    // Bonus assignments
-    lines.push('Bonus\tPlayer\t%\tAmount');
+    // Add deduction rows to summary
+    for (const d of deductions) {
+      const playerCut = playerCuts.find(p => p.id === d.playerId);
+      const totalCut = playerCut ? Math.round(playerCut.totalCut) : 0;
+      summaryRows.push([d.playerName, `${d.percentage}%`, String(Math.round(playerCut?.deduction || 0)), String(totalCut)]);
+    }
+
+    // Build bonuses column (E-I)
+    const bonusRows: string[][] = [
+      ['Bonuses', 'Player Name', '%', 'Amount', 'Total Cut'],
+    ];
     for (const assignment of assignments) {
       if (assignment.playerId !== null) {
         const bonus = BONUS_DEFINITIONS.find(b => b.id === assignment.bonusId);
         if (bonus) {
-          const amount = config.totalPot * (bonus.percentage / 100);
-          lines.push(`${bonus.name}\t${assignment.playerName}\t${bonus.percentage}%\t${formatGold(amount)}`);
+          const amount = Math.round(config.totalPot * (bonus.percentage / 100));
+          const playerCut = playerCuts.find(p => p.id === assignment.playerId);
+          const totalCut = playerCut ? Math.round(playerCut.totalCut) : 0;
+          bonusRows.push([bonus.name, assignment.playerName || '', `${bonus.percentage.toFixed(2)}%`, String(amount), String(totalCut)]);
         }
       }
     }
-    lines.push('');
 
-    // Deductions
-    if (deductions.length > 0) {
-      lines.push('Deduction\tPlayer\t%\tReason');
-      for (const d of deductions) {
-        lines.push(`Deduction\t${d.playerName}\t-${d.percentage}%\t${d.reason}`);
-      }
-      lines.push(`Total Deducted\t\t\t${formatGold(result.totalDeducted)}`);
-      lines.push('');
-    }
-
-    // Player totals
-    lines.push('Player\tTotal Cut');
+    // Build player summary column (K-L)
+    const playerRows: string[][] = [
+      ['Player', 'Gold'],
+    ];
     for (const cut of playerCuts) {
-      lines.push(`${cut.name}\t${formatGold(cut.totalCut)}`);
+      playerRows.push([cut.name, String(Math.round(cut.totalCut))]);
     }
+
+    // Build gargul column (N)
+    const gargulRows: string[][] = [
+      ['Gargul import'],
+      ['Player,Gold'],
+    ];
+    for (const cut of playerCuts) {
+      gargulRows.push([`${cut.name},${Math.round(cut.totalCut)}`]);
+    }
+
+    // Determine max rows
+    const maxRows = Math.max(summaryRows.length, bonusRows.length, playerRows.length, gargulRows.length);
+
+    // Build combined rows
+    const lines: string[] = [];
+    for (let i = 0; i < maxRows; i++) {
+      const summary = summaryRows[i] || ['', '', '', ''];
+      const bonus = bonusRows[i] || ['', '', '', '', ''];
+      const player = playerRows[i] || ['', ''];
+      const gargul = gargulRows[i] || [''];
+
+      // Pad summary to 4 columns (for deductions header)
+      while (summary.length < 4) summary.push('');
+
+      const row = [
+        ...summary,           // A-D (4 cols)
+        '',                   // E spacer
+        ...bonus,             // F-J (5 cols)
+        '',                   // K spacer
+        ...player,            // L-M (2 cols)
+        '',                   // N spacer
+        ...gargul,            // O (1 col)
+      ];
+      lines.push(row.join('\t'));
+    }
+
+    // Add footer row
+    const sumOfCuts = playerCuts.reduce((sum, p) => sum + p.totalCut, 0);
+    lines.push('');
+    lines.push(`Change total pot value\t\t\t\t\t\t\t\t\t${Math.round(result.bonusPool)}\tSum of cuts:\t\t${Math.round(sumOfCuts)}`);
 
     return lines.join('\n');
   };
