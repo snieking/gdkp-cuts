@@ -234,7 +234,7 @@ function App() {
         {/* Report loaded */}
         {reportData && (
           <>
-            <div className="bg-gray-800 rounded-lg p-4">
+            <div className="bg-gray-800 rounded-lg p-4 space-y-2">
               <p className="text-gray-300">
                 <span className="text-gray-500">Report:</span>{' '}
                 <span className="text-white font-medium">{reportData.code}</span>
@@ -244,14 +244,21 @@ function App() {
                   {reportData.raidType === 'worldtour' ? 'World Tour' : 'Naxxramas'}
                 </span>
                 <span className="mx-2 text-gray-600">|</span>
-                <span className="text-gray-500">Zone:</span>{' '}
-                <span className="text-green-400">{reportData.zone.name}</span>
-                <span className="mx-2 text-gray-600">|</span>
                 <span className="text-gray-500">Players:</span>{' '}
                 <span className="text-blue-400">{reportData.players.length}</span>
                 <span className="mx-2 text-gray-600">|</span>
                 <span className="text-gray-500">Boss Kills:</span>{' '}
                 <span className="text-yellow-400">{reportData.fights.length}</span>
+              </p>
+              <p className="text-gray-300">
+                <span className="text-gray-500">Zones:</span>{' '}
+                <span className="text-green-400">{reportData.zones.join(' → ')}</span>
+              </p>
+              <p className="text-gray-300">
+                <span className="text-gray-500">Time:</span>{' '}
+                <span className="text-cyan-400">
+                  {new Date(reportData.startTime).toLocaleString()} – {new Date(reportData.endTime).toLocaleString()}
+                </span>
               </p>
             </div>
 

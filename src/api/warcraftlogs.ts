@@ -192,16 +192,39 @@ export async function fetchReportData(code: string): Promise<ReportData> {
   const castsMight = mergeCasts(castsMightResult, castsGreaterMightResult);
   const castsWisdom = mergeCasts(castsWisdomResult, castsGreaterWisdomResult);
 
-  // Detect raid type from zone name
-  const raidType = detectRaidType(report.zone.name);
+  // Extract unique zones from fights
+  const zoneSet = new Set<string>();
+  for (const fight of report.fights) {
+    if (fight.gameZone?.name) {
+      zoneSet.add(fight.gameZone.name);
+    }
+  }
+  // Add primary zone if not already included
+  if (report.zone.name) {
+    zoneSet.add(report.zone.name);
+  }
+  const zones = Array.from(zoneSet);
+
+  // Detect raid type - check all zones for World Tour detection
+  let raidType = detectRaidType(report.zone.name);
   if (!raidType) {
-    throw new Error(`Unsupported zone: ${report.zone.name}. Only Naxxramas and World Tour (AQ40/BWL/MC) are supported.`);
+    // Check if any fight zone matches
+    for (const zoneName of zones) {
+      raidType = detectRaidType(zoneName);
+      if (raidType) break;
+    }
+  }
+  if (!raidType) {
+    throw new Error(`Unsupported zone: ${zones.join(', ')}. Only Naxxramas and World Tour (AQ40/BWL/MC) are supported.`);
   }
 
   return {
     code,
     zone: report.zone,
+    zones,
     raidType,
+    startTime,
+    endTime,
     fights: report.fights,
     players: report.masterData.actors,
     damageDone: damageDoneResult.reportData.report.table?.data?.entries || [],

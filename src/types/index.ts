@@ -10,6 +10,7 @@ export interface Fight {
   name: string;
   startTime: number;
   endTime: number;
+  gameZone?: { name: string };
 }
 
 export interface RankingEntry {
@@ -205,7 +206,10 @@ export interface PlayerCut {
 export interface ReportData {
   code: string;
   zone: { id: number; name: string };
+  zones: string[]; // All unique zone names in the report
   raidType: RaidType;
+  startTime: number; // Unix timestamp ms
+  endTime: number;   // Unix timestamp ms
   fights: Fight[];
   players: Player[];
   damageDone: RankingEntry[];

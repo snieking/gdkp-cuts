@@ -13,6 +13,9 @@ query GetReportData($code: String!) {
         name
         startTime
         endTime
+        gameZone {
+          name
+        }
       }
       masterData {
         actors(type: "Player") {
