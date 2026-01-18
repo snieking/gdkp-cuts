@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { ReportInput } from './components/ReportInput';
 import { ConfigPanel } from './components/ConfigPanel';
 import { BonusTable } from './components/BonusTable';
+import { DeductionsPanel } from './components/DeductionsPanel';
 import { PlayerSummary } from './components/PlayerSummary';
 import { ExportPanel } from './components/ExportPanel';
 import {
@@ -13,7 +14,7 @@ import {
 import { fetchReportData } from './api/warcraftlogs';
 import { autoDetectBonuses } from './utils/parsing';
 import { calculateCuts, CalculationResult } from './utils/calculations';
-import { ReportData, Config, BonusAssignment } from './types';
+import { ReportData, Config, BonusAssignment, Deduction } from './types';
 
 const DEFAULT_CONFIG: Config = {
   totalPot: 0,
@@ -26,6 +27,7 @@ interface ShareData {
   r: string; // report code
   c: { t: number; o: number; b: number; p: number }; // config
   a: { b: string; p: number; n: string }[]; // assignments
+  d?: { p: number; n: string; pct: number; r: string }[]; // deductions
 }
 
 function App() {
@@ -35,6 +37,7 @@ function App() {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG);
   const [assignments, setAssignments] = useState<BonusAssignment[]>([]);
+  const [deductions, setDeductions] = useState<Deduction[]>([]);
   const [result, setResult] = useState<CalculationResult | null>(null);
   const pendingShareData = useRef<ShareData | null>(null);
 
@@ -81,16 +84,16 @@ function App() {
     }
   }, [authenticated, reportData]);
 
-  // Recalculate when config or assignments change
+  // Recalculate when config, assignments, or deductions change
   useEffect(() => {
     if (!reportData || config.totalPot <= 0) {
       setResult(null);
       return;
     }
 
-    const calcResult = calculateCuts(config, assignments, reportData.players);
+    const calcResult = calculateCuts(config, assignments, reportData.players, deductions);
     setResult(calcResult);
-  }, [config, assignments, reportData]);
+  }, [config, assignments, deductions, reportData]);
 
   const handleLogin = () => {
     initiateLogin();
@@ -101,6 +104,7 @@ function App() {
     setAuthenticated(false);
     setReportData(null);
     setAssignments([]);
+    setDeductions([]);
     setResult(null);
   };
 
@@ -146,10 +150,24 @@ function App() {
           return d;
         });
         setAssignments(merged);
+
+        // Apply shared deductions
+        if (shareData.d) {
+          setDeductions(shareData.d.map(d => ({
+            id: `${Date.now()}-${d.p}`,
+            playerId: d.p,
+            playerName: d.n,
+            percentage: d.pct,
+            reason: d.r,
+          })));
+        } else {
+          setDeductions([]);
+        }
       } else {
         setConfig((c) => ({ ...c, playerCount: data.players.length }));
         const detected = autoDetectBonuses(data);
         setAssignments(detected);
+        setDeductions([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load report');
@@ -170,6 +188,14 @@ function App() {
           : a
       )
     );
+  };
+
+  const handleAddDeduction = (deduction: Deduction) => {
+    setDeductions((prev) => [...prev, deduction]);
+  };
+
+  const handleRemoveDeduction = (id: string) => {
+    setDeductions((prev) => prev.filter((d) => d.id !== id));
   };
 
   if (!authenticated) {
@@ -243,6 +269,15 @@ function App() {
               onAssignmentChange={handleAssignmentChange}
             />
 
+            {/* Deductions */}
+            <DeductionsPanel
+              deductions={deductions}
+              players={reportData.players}
+              totalDeducted={result?.totalDeducted || 0}
+              onAdd={handleAddDeduction}
+              onRemove={handleRemoveDeduction}
+            />
+
             {/* Results */}
             {result && config.totalPot > 0 && (
               <>
@@ -251,6 +286,7 @@ function App() {
                   playerCuts={result.playerCuts}
                   config={config}
                   assignments={assignments}
+                  deductions={deductions}
                   reportCode={reportData.code}
                   result={result}
                 />

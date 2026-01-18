@@ -4,6 +4,7 @@ import {
   PlayerCut,
   BONUS_DEFINITIONS,
   Player,
+  Deduction,
 } from '../types';
 
 export interface CalculationResult {
@@ -11,6 +12,7 @@ export interface CalculationResult {
   bonusPool: number;
   evenSplitPool: number;
   baseCut: number;
+  totalDeducted: number;
   playerCuts: PlayerCut[];
   totalDistributed: number;
 }
@@ -18,7 +20,8 @@ export interface CalculationResult {
 export function calculateCuts(
   config: Config,
   assignments: BonusAssignment[],
-  players: Player[]
+  players: Player[],
+  deductions: Deduction[] = []
 ): CalculationResult {
   const { totalPot, organizerCutPercent, bonusPoolPercent, playerCount } = config;
 
@@ -38,6 +41,8 @@ export function calculateCuts(
       name: player.name,
       baseCut,
       bonuses: [],
+      deduction: 0,
+      redistributedGain: 0,
       totalCut: baseCut,
     });
   }
@@ -59,6 +64,8 @@ export function calculateCuts(
         name: assignment.playerName || `Player ${assignment.playerId}`,
         baseCut,
         bonuses: [],
+        deduction: 0,
+        redistributedGain: 0,
         totalCut: baseCut,
       };
       playerCutsMap.set(assignment.playerId, playerCut);
@@ -72,6 +79,27 @@ export function calculateCuts(
     playerCut.totalCut += bonusAmount;
   }
 
+  // Apply deductions
+  let totalDeducted = 0;
+  for (const deduction of deductions) {
+    const playerCut = playerCutsMap.get(deduction.playerId);
+    if (playerCut) {
+      const deductionAmount = playerCut.totalCut * (deduction.percentage / 100);
+      playerCut.deduction += deductionAmount;
+      playerCut.totalCut -= deductionAmount;
+      totalDeducted += deductionAmount;
+    }
+  }
+
+  // Redistribute deducted gold evenly to all players
+  if (totalDeducted > 0 && playerCutsMap.size > 0) {
+    const perPlayerGain = totalDeducted / playerCutsMap.size;
+    for (const playerCut of playerCutsMap.values()) {
+      playerCut.redistributedGain += perPlayerGain;
+      playerCut.totalCut += perPlayerGain;
+    }
+  }
+
   const playerCuts = Array.from(playerCutsMap.values()).sort(
     (a, b) => b.totalCut - a.totalCut
   );
@@ -83,6 +111,7 @@ export function calculateCuts(
     bonusPool,
     evenSplitPool,
     baseCut,
+    totalDeducted,
     playerCuts,
     totalDistributed,
   };

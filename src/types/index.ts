@@ -118,11 +118,21 @@ export interface Config {
   playerCount: number;
 }
 
+export interface Deduction {
+  id: string;
+  playerId: number;
+  playerName: string;
+  percentage: number;
+  reason: string;
+}
+
 export interface PlayerCut {
   id: number;
   name: string;
   baseCut: number;
   bonuses: { bonusId: string; bonusName: string; amount: number }[];
+  deduction: number;
+  redistributedGain: number;
   totalCut: number;
 }
 

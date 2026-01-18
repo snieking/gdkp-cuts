@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { PlayerCut, Config, BonusAssignment, BONUS_DEFINITIONS } from '../types';
+import { PlayerCut, Config, BonusAssignment, Deduction, BONUS_DEFINITIONS } from '../types';
 import { generateGargulExport, formatGold, CalculationResult } from '../utils/calculations';
 
 interface Props {
   playerCuts: PlayerCut[];
   config: Config;
   assignments: BonusAssignment[];
+  deductions: Deduction[];
   reportCode: string;
   result: CalculationResult;
 }
 
-export function ExportPanel({ playerCuts, config, assignments, reportCode, result }: Props) {
+export function ExportPanel({ playerCuts, config, assignments, deductions, reportCode, result }: Props) {
   const [copiedGargul, setCopiedGargul] = useState(false);
   const [copiedSheet, setCopiedSheet] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -50,6 +51,16 @@ export function ExportPanel({ playerCuts, config, assignments, reportCode, resul
     }
     lines.push('');
 
+    // Deductions
+    if (deductions.length > 0) {
+      lines.push('Deduction\tPlayer\t%\tReason');
+      for (const d of deductions) {
+        lines.push(`Deduction\t${d.playerName}\t-${d.percentage}%\t${d.reason}`);
+      }
+      lines.push(`Total Deducted\t\t\t${formatGold(result.totalDeducted)}`);
+      lines.push('');
+    }
+
     // Player totals
     lines.push('Player\tTotal Cut');
     for (const cut of playerCuts) {
@@ -67,7 +78,12 @@ export function ExportPanel({ playerCuts, config, assignments, reportCode, resul
 
   // Generate shareable URL
   const generateShareUrl = () => {
-    const shareData = {
+    const shareData: {
+      r: string;
+      c: { t: number; o: number; b: number; p: number };
+      a: { b: string; p: number | null; n: string | null }[];
+      d?: { p: number; n: string; pct: number; r: string }[];
+    } = {
       r: reportCode,
       c: {
         t: config.totalPot,
@@ -83,6 +99,15 @@ export function ExportPanel({ playerCuts, config, assignments, reportCode, resul
           n: a.playerName,
         })),
     };
+
+    if (deductions.length > 0) {
+      shareData.d = deductions.map(d => ({
+        p: d.playerId,
+        n: d.playerName,
+        pct: d.percentage,
+        r: d.reason,
+      }));
+    }
 
     const encoded = btoa(JSON.stringify(shareData));
     const url = new URL(window.location.href.split('?')[0]);
