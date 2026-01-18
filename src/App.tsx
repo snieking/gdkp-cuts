@@ -91,7 +91,7 @@ function App() {
       return;
     }
 
-    const calcResult = calculateCuts(config, assignments, reportData.players, deductions);
+    const calcResult = calculateCuts(config, assignments, reportData.players, deductions, reportData.raidType);
     setResult(calcResult);
   }, [config, assignments, deductions, reportData]);
 
@@ -114,14 +114,6 @@ function App() {
 
     try {
       const data = await fetchReportData(code);
-
-      // Check zone
-      if (!data.zone.name.toLowerCase().includes('naxxramas')) {
-        setError(`This tool is for Naxxramas only. Report zone: ${data.zone.name}`);
-        setLoading(false);
-        return;
-      }
-
       setReportData(data);
 
       // Apply shared config or use defaults
@@ -247,6 +239,11 @@ function App() {
                 <span className="text-gray-500">Report:</span>{' '}
                 <span className="text-white font-medium">{reportData.code}</span>
                 <span className="mx-2 text-gray-600">|</span>
+                <span className="text-gray-500">Type:</span>{' '}
+                <span className="text-purple-400">
+                  {reportData.raidType === 'worldtour' ? 'World Tour' : 'Naxxramas'}
+                </span>
+                <span className="mx-2 text-gray-600">|</span>
                 <span className="text-gray-500">Zone:</span>{' '}
                 <span className="text-green-400">{reportData.zone.name}</span>
                 <span className="mx-2 text-gray-600">|</span>
@@ -266,6 +263,7 @@ function App() {
               assignments={assignments}
               players={reportData.players}
               totalPot={config.totalPot}
+              raidType={reportData.raidType}
               onAssignmentChange={handleAssignmentChange}
             />
 
@@ -288,6 +286,7 @@ function App() {
                   assignments={assignments}
                   deductions={deductions}
                   reportCode={reportData.code}
+                  raidType={reportData.raidType}
                   result={result}
                 />
               </>

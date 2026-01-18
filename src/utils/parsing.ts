@@ -1,7 +1,7 @@
 import {
   ReportData,
   BonusAssignment,
-  BONUS_DEFINITIONS,
+  getBonusDefinitions,
   RankingEntry,
   CastEntry,
 } from '../types';
@@ -20,8 +20,9 @@ function findRankedCaster(entries: CastEntry[], rank: number): CastEntry | null 
 
 export function autoDetectBonuses(reportData: ReportData): BonusAssignment[] {
   const assignments: BonusAssignment[] = [];
+  const bonusDefinitions = getBonusDefinitions(reportData.raidType);
 
-  for (const bonus of BONUS_DEFINITIONS) {
+  for (const bonus of bonusDefinitions) {
     let assignment: BonusAssignment = {
       bonusId: bonus.id,
       playerId: null,

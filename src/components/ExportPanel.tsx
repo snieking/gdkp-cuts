@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlayerCut, Config, BonusAssignment, Deduction, BONUS_DEFINITIONS } from '../types';
+import { PlayerCut, Config, BonusAssignment, Deduction, getBonusDefinitions, RaidType } from '../types';
 import { generateGargulExport, CalculationResult } from '../utils/calculations';
 
 interface Props {
@@ -8,10 +8,12 @@ interface Props {
   assignments: BonusAssignment[];
   deductions: Deduction[];
   reportCode: string;
+  raidType: RaidType;
   result: CalculationResult;
 }
 
-export function ExportPanel({ playerCuts, config, assignments, deductions, reportCode, result }: Props) {
+export function ExportPanel({ playerCuts, config, assignments, deductions, reportCode, raidType, result }: Props) {
+  const bonusDefinitions = getBonusDefinitions(raidType);
   const [copiedGargul, setCopiedGargul] = useState(false);
   const [copiedSheet, setCopiedSheet] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -58,7 +60,7 @@ export function ExportPanel({ playerCuts, config, assignments, deductions, repor
     ];
     for (const assignment of assignments) {
       if (assignment.playerId !== null) {
-        const bonus = BONUS_DEFINITIONS.find(b => b.id === assignment.bonusId);
+        const bonus = bonusDefinitions.find(b => b.id === assignment.bonusId);
         if (bonus) {
           const amount = Math.round(config.totalPot * (bonus.percentage / 100));
           const playerCut = playerCuts.find(p => p.id === assignment.playerId);

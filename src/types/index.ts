@@ -39,6 +39,8 @@ export interface CastEntry {
 
 export type BonusCategory = 'tank' | 'dps' | 'healer' | 'debuff' | 'utility' | 'manual';
 
+export type RaidType = 'naxxramas' | 'worldtour';
+
 export interface BonusDefinition {
   id: string;
   name: string;
@@ -50,7 +52,8 @@ export interface BonusDefinition {
   fightName?: string;
 }
 
-export const BONUS_DEFINITIONS: BonusDefinition[] = [
+// Naxxramas bonus definitions
+export const NAXXRAMAS_BONUS_DEFINITIONS: BonusDefinition[] = [
   // Tanks (by damage taken)
   { id: 'tank1', name: 'Tank 1', percentage: 1.15, category: 'tank', detectionMethod: 'damageTaken', rank: 1 },
   { id: 'tank2', name: 'Tank 2', percentage: 1.15, category: 'tank', detectionMethod: 'damageTaken', rank: 2 },
@@ -104,6 +107,69 @@ export const BONUS_DEFINITIONS: BonusDefinition[] = [
   { id: 'masterLooter', name: 'Master Looter', percentage: 1.00, category: 'manual', detectionMethod: 'manual' },
 ];
 
+// World Tour (AQ40 -> BWL -> MC) bonus definitions
+export const WORLD_TOUR_BONUS_DEFINITIONS: BonusDefinition[] = [
+  // Tanks (by damage taken)
+  { id: 'tank1', name: 'Tank 1', percentage: 1.15, category: 'tank', detectionMethod: 'damageTaken', rank: 1 },
+  { id: 'tank2', name: 'Tank 2', percentage: 1.15, category: 'tank', detectionMethod: 'damageTaken', rank: 2 },
+  { id: 'tank3', name: 'Tank 3', percentage: 0.95, category: 'tank', detectionMethod: 'damageTaken', rank: 3 },
+  { id: 'tank4', name: 'Tank 4', percentage: 0.70, category: 'tank', detectionMethod: 'damageTaken', rank: 4 },
+  { id: 'tank5', name: 'Tank 5', percentage: 0.45, category: 'tank', detectionMethod: 'damageTaken', rank: 5 },
+  { id: 'tank6', name: 'Tank 6', percentage: 0.40, category: 'tank', detectionMethod: 'damageTaken', rank: 6 },
+
+  // DPS (by damage done)
+  { id: 'dps1', name: 'DPS 1', percentage: 1.20, category: 'dps', detectionMethod: 'damageDone', rank: 1 },
+  { id: 'dps2', name: 'DPS 2', percentage: 1.05, category: 'dps', detectionMethod: 'damageDone', rank: 2 },
+  { id: 'dps3', name: 'DPS 3', percentage: 0.90, category: 'dps', detectionMethod: 'damageDone', rank: 3 },
+  { id: 'dps4', name: 'DPS 4', percentage: 0.80, category: 'dps', detectionMethod: 'damageDone', rank: 4 },
+  { id: 'dps5', name: 'DPS 5', percentage: 0.70, category: 'dps', detectionMethod: 'damageDone', rank: 5 },
+  { id: 'dps6', name: 'DPS 6', percentage: 0.60, category: 'dps', detectionMethod: 'damageDone', rank: 6 },
+  { id: 'dps7', name: 'DPS 7', percentage: 0.50, category: 'dps', detectionMethod: 'damageDone', rank: 7 },
+  { id: 'dps8', name: 'DPS 8', percentage: 0.40, category: 'dps', detectionMethod: 'damageDone', rank: 8 },
+  { id: 'dps9', name: 'DPS 9', percentage: 0.30, category: 'dps', detectionMethod: 'damageDone', rank: 9 },
+  { id: 'dps10', name: 'DPS 10', percentage: 0.25, category: 'dps', detectionMethod: 'damageDone', rank: 10 },
+  { id: 'dps11', name: 'DPS 11', percentage: 0.25, category: 'dps', detectionMethod: 'damageDone', rank: 11 },
+  { id: 'dps12', name: 'DPS 12', percentage: 0.20, category: 'dps', detectionMethod: 'damageDone', rank: 12 },
+  { id: 'dps13', name: 'DPS 13', percentage: 0.20, category: 'dps', detectionMethod: 'damageDone', rank: 13 },
+
+  // Healers (by healing done) - different percentages for World Tour
+  { id: 'healer1', name: 'Healer 1', percentage: 0.85, category: 'healer', detectionMethod: 'healingDone', rank: 1 },
+  { id: 'healer2', name: 'Healer 2', percentage: 0.75, category: 'healer', detectionMethod: 'healingDone', rank: 2 },
+  { id: 'healer3', name: 'Healer 3', percentage: 0.65, category: 'healer', detectionMethod: 'healingDone', rank: 3 },
+  { id: 'healer4', name: 'Healer 4', percentage: 0.55, category: 'healer', detectionMethod: 'healingDone', rank: 4 },
+  { id: 'healer5', name: 'Healer 5', percentage: 0.45, category: 'healer', detectionMethod: 'healingDone', rank: 5 },
+  { id: 'healer6', name: 'Healer 6', percentage: 0.35, category: 'healer', detectionMethod: 'healingDone', rank: 6 },
+  { id: 'healer7', name: 'Healer 7', percentage: 0.20, category: 'healer', detectionMethod: 'healingDone', rank: 7 },
+  { id: 'healer8', name: 'Healer 8', percentage: 0.15, category: 'healer', detectionMethod: 'healingDone', rank: 8 },
+
+  // Debuffs (detected by cast count)
+  { id: 'exposeArmor', name: 'Expose / IEA', percentage: 0.40, category: 'debuff', detectionMethod: 'cast', rank: 1 },
+  { id: 'faerieFire', name: 'Faerie Fire', percentage: 0.40, category: 'debuff', detectionMethod: 'cast', rank: 1 },
+  { id: 'curseRecklessness', name: 'CoR', percentage: 0.40, category: 'debuff', detectionMethod: 'cast', rank: 1 },
+  { id: 'curseElements', name: 'CoE', percentage: 0.40, category: 'debuff', detectionMethod: 'cast', rank: 1 },
+
+  // Utility - World Tour specific (no Priest MC, no Top Decurse)
+  { id: 'wlTank1', name: 'WL Tank 1', percentage: 0.15, category: 'utility', detectionMethod: 'manual' },
+  { id: 'wlTank2', name: 'WL Tank 2', percentage: 0.15, category: 'utility', detectionMethod: 'manual' },
+  { id: 'kings', name: 'Kings', percentage: 0.20, category: 'utility', detectionMethod: 'cast', rank: 1 },
+  { id: 'mightWisdom', name: 'Might + Wisdom', percentage: 0.20, category: 'utility', detectionMethod: 'cast', rank: 1 },
+  { id: 'salvation', name: 'Salvation', percentage: 0.25, category: 'utility', detectionMethod: 'cast', rank: 1 },
+
+  // Manual
+  { id: 'pullingMarks', name: 'Pulling + Marks', percentage: 0.70, category: 'manual', detectionMethod: 'manual' },
+  { id: 'aq40Id', name: 'AQ40 ID', percentage: 0.35, category: 'manual', detectionMethod: 'manual' },
+  { id: 'topSpender', name: 'Top Spender', percentage: 0.30, category: 'manual', detectionMethod: 'manual' },
+  { id: 'masterLooter', name: 'Master Looter', percentage: 1.00, category: 'manual', detectionMethod: 'manual' },
+];
+
+// Helper to get bonus definitions by raid type
+export function getBonusDefinitions(raidType: RaidType): BonusDefinition[] {
+  return raidType === 'worldtour' ? WORLD_TOUR_BONUS_DEFINITIONS : NAXXRAMAS_BONUS_DEFINITIONS;
+}
+
+// Keep BONUS_DEFINITIONS as alias for backward compatibility
+export const BONUS_DEFINITIONS = NAXXRAMAS_BONUS_DEFINITIONS;
+
 export interface BonusAssignment {
   bonusId: string;
   playerId: number | null;
@@ -139,6 +205,7 @@ export interface PlayerCut {
 export interface ReportData {
   code: string;
   zone: { id: number; name: string };
+  raidType: RaidType;
   fights: Fight[];
   players: Player[];
   damageDone: RankingEntry[];
@@ -194,3 +261,28 @@ export const SPELL_IDS = {
 };
 
 export const NAXXRAMAS_ZONE_ID = 533;
+
+// World Tour zone names (AQ40, BWL, MC)
+export const WORLD_TOUR_ZONES = [
+  "temple of ahn'qiraj", // AQ40
+  'blackwing lair',      // BWL
+  'molten core',         // MC
+];
+
+// Detect raid type from zone name
+export function detectRaidType(zoneName: string): RaidType | null {
+  const lower = zoneName.toLowerCase();
+
+  if (lower.includes('naxxramas')) {
+    return 'naxxramas';
+  }
+
+  // Check if it's a World Tour zone
+  for (const zone of WORLD_TOUR_ZONES) {
+    if (lower.includes(zone)) {
+      return 'worldtour';
+    }
+  }
+
+  return null;
+}

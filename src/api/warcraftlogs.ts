@@ -18,6 +18,7 @@ import {
   DispelEntry,
   CastEntry,
   SPELL_IDS,
+  detectRaidType,
 } from '../types';
 
 const API_URL = 'https://www.warcraftlogs.com/api/v2/client';
@@ -191,9 +192,16 @@ export async function fetchReportData(code: string): Promise<ReportData> {
   const castsMight = mergeCasts(castsMightResult, castsGreaterMightResult);
   const castsWisdom = mergeCasts(castsWisdomResult, castsGreaterWisdomResult);
 
+  // Detect raid type from zone name
+  const raidType = detectRaidType(report.zone.name);
+  if (!raidType) {
+    throw new Error(`Unsupported zone: ${report.zone.name}. Only Naxxramas and World Tour (AQ40/BWL/MC) are supported.`);
+  }
+
   return {
     code,
     zone: report.zone,
+    raidType,
     fights: report.fights,
     players: report.masterData.actors,
     damageDone: damageDoneResult.reportData.report.table?.data?.entries || [],

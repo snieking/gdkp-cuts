@@ -2,9 +2,10 @@ import {
   Config,
   BonusAssignment,
   PlayerCut,
-  BONUS_DEFINITIONS,
+  getBonusDefinitions,
   Player,
   Deduction,
+  RaidType,
 } from '../types';
 
 export interface CalculationResult {
@@ -21,9 +22,11 @@ export function calculateCuts(
   config: Config,
   assignments: BonusAssignment[],
   players: Player[],
-  deductions: Deduction[] = []
+  deductions: Deduction[] = [],
+  raidType: RaidType = 'naxxramas'
 ): CalculationResult {
   const { totalPot, organizerCutPercent, bonusPoolPercent, playerCount } = config;
+  const bonusDefinitions = getBonusDefinitions(raidType);
 
   // Calculate pools
   const goldToDistribute = totalPot * (1 - organizerCutPercent / 100);
@@ -51,7 +54,7 @@ export function calculateCuts(
   for (const assignment of assignments) {
     if (assignment.playerId === null) continue;
 
-    const bonus = BONUS_DEFINITIONS.find((b) => b.id === assignment.bonusId);
+    const bonus = bonusDefinitions.find((b) => b.id === assignment.bonusId);
     if (!bonus) continue;
 
     const bonusAmount = totalPot * (bonus.percentage / 100);

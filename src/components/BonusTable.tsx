@@ -1,10 +1,11 @@
-import { BonusAssignment, BONUS_DEFINITIONS, Player, BonusCategory } from '../types';
+import { BonusAssignment, getBonusDefinitions, Player, BonusCategory, RaidType } from '../types';
 import { formatGold } from '../utils/calculations';
 
 interface Props {
   assignments: BonusAssignment[];
   players: Player[];
   totalPot: number;
+  raidType: RaidType;
   onAssignmentChange: (bonusId: string, playerId: number | null, playerName: string | null) => void;
 }
 
@@ -29,7 +30,8 @@ const CATEGORY_COLORS: Record<BonusCategory, string> = {
   manual: 'bg-gray-700/50',
 };
 
-export function BonusTable({ assignments, players, totalPot, onAssignmentChange }: Props) {
+export function BonusTable({ assignments, players, totalPot, raidType, onAssignmentChange }: Props) {
+  const bonusDefinitions = getBonusDefinitions(raidType);
   const assignmentMap = new Map(assignments.map((a) => [a.bonusId, a]));
 
   const handlePlayerSelect = (bonusId: string, e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -56,7 +58,7 @@ export function BonusTable({ assignments, players, totalPot, onAssignmentChange 
 
       <div className="divide-y divide-gray-700">
         {CATEGORY_ORDER.map((category) => {
-          const bonuses = BONUS_DEFINITIONS.filter((b) => b.category === category);
+          const bonuses = bonusDefinitions.filter((b) => b.category === category);
           if (bonuses.length === 0) return null;
 
           return (
