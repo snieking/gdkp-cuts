@@ -191,6 +191,7 @@ export interface Deduction {
   playerName: string;
   percentage: number;
   reason: string;
+  ruleId?: string; // Links back to the rule that created this deduction
 }
 
 export interface PlayerCut {
@@ -298,3 +299,37 @@ export function detectRaidType(zoneName: string): RaidType | null {
 
   return null;
 }
+
+// Suggested deduction types
+export interface SuggestedDeduction {
+  ruleId: string;
+  playerId: number;
+  playerName: string;
+  percentage: number;
+  reason: string;
+  details?: string; // e.g., "Frost Resist: 85/120"
+}
+
+export interface CombatantInfo {
+  id: number;
+  name: string;
+  type: string;
+  specs: { spec: string; role: string }[];
+  frostResistance: number;
+}
+
+// Flask spell IDs (all Classic flasks that matter)
+export const FLASK_SPELL_IDS = {
+  FLASK_OF_THE_TITANS: 17626,        // +1200 HP
+  FLASK_OF_DISTILLED_WISDOM: 17627,  // +2000 Mana
+  FLASK_OF_SUPREME_POWER: 17628,     // +150 Spell Power
+  FLASK_OF_CHROMATIC_RESISTANCE: 17629, // +25 all resist
+};
+
+// Physical DPS classes/specs
+export const PHYSICAL_DPS_TYPES = ['Warrior', 'Rogue', 'Hunter'];
+// Caster DPS classes/specs
+export const CASTER_DPS_TYPES = ['Mage', 'Warlock'];
+
+// Sapphiron encounter ID in Naxxramas
+export const SAPPHIRON_ENCOUNTER_ID = 1119;
