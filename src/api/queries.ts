@@ -131,6 +131,8 @@ query GetAllFights($code: String!) {
         name
         kill
         encounterID
+        startTime
+        endTime
       }
     }
   }
@@ -174,6 +176,30 @@ query GetDamageEvents($code: String!, $fightIDs: [Int]!, $startTime: Float!, $en
           name
           type
         }
+      }
+    }
+  }
+}
+`;
+
+// Get buffs table for specific fights
+export const GET_BUFFS_BY_FIGHT = `
+query GetBuffsByFight($code: String!, $fightIDs: [Int]!) {
+  reportData {
+    report(code: $code) {
+      table(dataType: Buffs, fightIDs: $fightIDs)
+    }
+  }
+}
+`;
+
+// Get raw combatant info events (contains gear and stats)
+export const GET_COMBATANT_INFO_EVENTS = `
+query GetCombatantInfoEvents($code: String!, $fightIDs: [Int]!) {
+  reportData {
+    report(code: $code) {
+      events(fightIDs: $fightIDs, dataType: CombatantInfo, limit: 500) {
+        data
       }
     }
   }

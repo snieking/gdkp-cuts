@@ -9,9 +9,10 @@ import {
   GET_DISPELS,
   GET_CASTS_BY_TIME,
   GET_COMBATANT_INFO,
-  GET_ALL_FIGHTS,
   GET_BUFFS_BY_ABILITY,
   GET_DAMAGE_EVENTS,
+  GET_ALL_FIGHTS,
+  GET_COMBATANT_INFO_EVENTS,
 } from './queries';
 import {
   ReportData,
@@ -26,6 +27,7 @@ import {
   detectRaidType,
   CombatantInfo,
 } from '../types';
+import frostResistItems from '../data/frostResistItems.json';
 
 const API_URL = 'https://www.warcraftlogs.com/api/v2/client';
 
@@ -277,48 +279,11 @@ export async function fetchReportData(code: string): Promise<ReportData> {
 
 // Fetch combatant info for specific fights (includes gear stats like frost resistance)
 export async function fetchCombatantInfo(code: string, fightIDs: number[]): Promise<CombatantInfo[]> {
-  // WCL playerDetails returns JSON directly with structure varying by game version
-  // For Classic, combatantInfo contains gear array and stats
-  interface PlayerDetailsEntry {
-    id: number;
-    name: string;
-    type: string;
-    specs?: { spec: string; role: string }[];
-    combatantInfo?: {
-      stats?: {
-        // Classic WoW resistance stats
-        Frost?: { min: number; max: number };
-        Fire?: { min: number; max: number };
-        Nature?: { min: number; max: number };
-        Shadow?: { min: number; max: number };
-        Arcane?: { min: number; max: number };
-      };
-      // Alternative: resistances might be in gear totals
-      gear?: { permanentEnchant?: number; id: number }[];
-    };
-  }
-
-  interface PlayerDetailsResponse {
-    data?: {
-      playerDetails?: {
-        tanks?: PlayerDetailsEntry[];
-        healers?: PlayerDetailsEntry[];
-        dps?: PlayerDetailsEntry[];
-      };
-    };
-    // Alternative flat structure
-    tanks?: PlayerDetailsEntry[];
-    healers?: PlayerDetailsEntry[];
-    dps?: PlayerDetailsEntry[];
-  }
-
-  const result = await graphqlRequest<{
-    reportData: {
-      report: {
-        playerDetails: PlayerDetailsResponse;
-      };
-    };
-  }>(GET_COMBATANT_INFO, { code, fightIDs });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await graphqlRequest<{ reportData: { report: { playerDetails: any } } }>(
+    GET_COMBATANT_INFO,
+    { code, fightIDs }
+  );
 
   const rawDetails = result.reportData.report.playerDetails;
   if (!rawDetails) {
@@ -326,36 +291,41 @@ export async function fetchCombatantInfo(code: string, fightIDs: number[]): Prom
     return [];
   }
 
-  // Handle nested data structure: { data: { playerDetails: { tanks, healers, dps } } }
+  // Debug: log FULL raw structure to understand what WCL returns
+  console.log('=== COMBATANT INFO RAW STRUCTURE ===');
+  console.log('Full playerDetails:', JSON.stringify(rawDetails, null, 2).slice(0, 5000));
+
+  // Check for nested data structure
   const details = rawDetails.data?.playerDetails || rawDetails;
 
-  // Debug: log the full structure
-  console.log('=== FROST RESISTANCE DEBUG ===');
-  console.log('Raw playerDetails:', rawDetails);
-  console.log('Parsed details:', details);
-
-  // Log first player from each role with their full combatantInfo
-  const firstDps = details.dps?.[0];
-  const firstTank = details.tanks?.[0];
-  if (firstDps) {
-    console.log('First DPS player full data:', JSON.stringify(firstDps, null, 2));
-    console.log('combatantInfo type:', typeof firstDps.combatantInfo, Array.isArray(firstDps.combatantInfo) ? 'array' : 'object');
+  // Get first player and log their COMPLETE structure
+  const allRoles = [...(details.tanks || []), ...(details.healers || []), ...(details.dps || [])];
+  if (allRoles.length > 0) {
+    console.log('First player COMPLETE:', JSON.stringify(allRoles[0], null, 2));
+    // Also check if combatantInfo is an array (Classic-specific structure)
+    const ci = allRoles[0].combatantInfo;
+    if (ci) {
+      console.log('combatantInfo keys:', Object.keys(ci));
+      console.log('combatantInfo full:', JSON.stringify(ci, null, 2).slice(0, 2000));
+    }
   }
-  if (firstTank) {
-    console.log('First Tank player full data:', JSON.stringify(firstTank, null, 2));
-  }
-  console.log('=== END FROST RESISTANCE DEBUG ===');
+  console.log('=== END COMBATANT INFO ===');
 
-  const allPlayers = [
-    ...(details.tanks || []),
-    ...(details.healers || []),
-    ...(details.dps || []),
-  ];
+  return allRoles.map((p: { id: number; name: string; type: string; specs?: { spec: string; role: string }[]; combatantInfo?: { stats?: { Frost?: { min: number; max: number } } } }) => {
+    // Try multiple possible structures for frost resistance
+    const ci = p.combatantInfo;
+    let frostResistance = 0;
 
-  return allPlayers.map((p) => {
-    // Try to extract frost resistance from stats
-    const frostStat = p.combatantInfo?.stats?.Frost;
-    const frostResistance = frostStat?.min ?? frostStat?.max ?? 0;
+    if (ci) {
+      // Try: stats.Frost.min/max
+      frostResistance = ci.stats?.Frost?.min ?? ci.stats?.Frost?.max ?? 0;
+      // Try: direct frostResistance field
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!frostResistance && (ci as any).frostResistance) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        frostResistance = (ci as any).frostResistance;
+      }
+    }
 
     return {
       id: p.id,
@@ -365,6 +335,147 @@ export async function fetchCombatantInfo(code: string, fightIDs: number[]): Prom
       frostResistance,
     };
   });
+}
+
+// FR buff ability IDs
+const FR_AURA_IDS = {
+  frostResistanceAura: [19888, 19897, 19898], // Paladin FR Aura ranks
+  markOfTheWild: [9885, 21850, 9884, 21849], // MotW / GotW ranks
+  jujuChill: [16325], // Juju Chill consumable
+};
+
+export interface PlayerFRBuffs {
+  sourceID: number;
+  hasFrostAura: boolean;
+  hasMotW: boolean;
+  hasJujuChill: boolean;
+  gearFrostResist: number; // Exact FR from equipped gear
+}
+
+// Frost resistance from gear - itemId -> frostRes
+const FROST_RESIST_ITEMS: Record<string, number> = frostResistItems;
+
+// Frost resistance enchants - enchantId (ItemEnchantment ID from DBC) -> frostRes
+const FROST_RESIST_ENCHANTS: Record<number, number> = {
+  // Ice Guard (head/legs) - +10 FR
+  2543: 10,
+  // Frost Mantle of the Dawn (shoulder) - +5 FR
+  2484: 5,
+  // Enchant Cloak - Greater Resistance - +5 all res (spell 20014)
+  1888: 5,
+  // Enchant Cloak - Resistance - +3 all res (spell 13794)
+  903: 3,
+};
+
+// Fetch raw combatant info events and extract FR buffs + gear FR
+export async function fetchCombatantInfoEvents(code: string, fightIDs: number[]): Promise<Map<number, PlayerFRBuffs>> {
+  interface GearItem {
+    id: number;
+    permanentEnchant?: number;
+    temporaryEnchant?: number;
+  }
+
+  interface CombatantInfoEvent {
+    sourceID: number;
+    auras?: { ability: number; name: string }[];
+    gear?: GearItem[];
+  }
+
+  const result = await graphqlRequest<{ reportData: { report: { events: { data: CombatantInfoEvent[] } } } }>(
+    GET_COMBATANT_INFO_EVENTS,
+    { code, fightIDs }
+  );
+
+  const events = result.reportData.report.events?.data || [];
+  const playerBuffs = new Map<number, PlayerFRBuffs>();
+
+  console.log('=== COMBATANT INFO FR + GEAR DETECTION ===');
+  console.log('Total combatant info events:', events.length);
+
+  for (const event of events) {
+    const sourceID = event.sourceID;
+    const auras = event.auras || [];
+    const gear = event.gear || [];
+
+    // Check for FR buffs in the auras array
+    let hasFrostAura = false;
+    let hasMotW = false;
+    let hasJujuChill = false;
+
+    for (const aura of auras) {
+      if (FR_AURA_IDS.frostResistanceAura.includes(aura.ability)) {
+        hasFrostAura = true;
+      }
+      if (FR_AURA_IDS.markOfTheWild.includes(aura.ability)) {
+        hasMotW = true;
+      }
+      if (FR_AURA_IDS.jujuChill.includes(aura.ability)) {
+        hasJujuChill = true;
+      }
+    }
+
+    // Calculate frost resistance from gear (items + enchants)
+    // Slot order: 0=Head, 1=Neck, 2=Shoulder, 3=Back/Cloak, 4=Chest, ...
+    let gearFrostResist = 0;
+    const unknownEnchants: number[] = [];
+    const enchantsBySlot: { slot: number; enchant: number; fr: number }[] = [];
+
+    for (let slotIdx = 0; slotIdx < gear.length; slotIdx++) {
+      const item = gear[slotIdx];
+      // Add FR from item itself
+      const itemFR = FROST_RESIST_ITEMS[String(item.id)];
+      if (itemFR) {
+        gearFrostResist += itemFR;
+      }
+      // Add FR from permanent enchant (e.g., Ice Guard, Greater Resistance)
+      if (item.permanentEnchant) {
+        const enchantFR = FROST_RESIST_ENCHANTS[item.permanentEnchant];
+        if (enchantFR) {
+          gearFrostResist += enchantFR;
+          enchantsBySlot.push({ slot: slotIdx, enchant: item.permanentEnchant, fr: enchantFR });
+        } else if (item.permanentEnchant > 0) {
+          // Log unknown enchants for debugging
+          unknownEnchants.push(item.permanentEnchant);
+        }
+      }
+      // Special debug for cloak slot (slot 3)
+      if (slotIdx === 3) {
+        console.log(`  Cloak slot for sourceID ${sourceID}: itemId=${item.id}, enchant=${item.permanentEnchant || 'none'}`);
+      }
+    }
+    if (enchantsBySlot.length > 0) {
+      console.log(`  Found FR enchants for sourceID ${sourceID}:`, enchantsBySlot);
+    }
+    if (unknownEnchants.length > 0) {
+      console.log(`  Unknown enchant IDs for sourceID ${sourceID}:`, unknownEnchants);
+    }
+
+    // Store the data (if player appears in multiple fights, use highest gear FR)
+    const existing = playerBuffs.get(sourceID);
+    if (existing) {
+      existing.hasFrostAura = existing.hasFrostAura || hasFrostAura;
+      existing.hasMotW = existing.hasMotW || hasMotW;
+      existing.hasJujuChill = existing.hasJujuChill || hasJujuChill;
+      existing.gearFrostResist = Math.max(existing.gearFrostResist, gearFrostResist);
+    } else {
+      playerBuffs.set(sourceID, { sourceID, hasFrostAura, hasMotW, hasJujuChill, gearFrostResist });
+    }
+  }
+
+  // Log summary
+  let auraCount = 0, motwCount = 0, jujuCount = 0;
+  const gearFRValues: number[] = [];
+  for (const [, buffs] of playerBuffs) {
+    if (buffs.hasFrostAura) auraCount++;
+    if (buffs.hasMotW) motwCount++;
+    if (buffs.hasJujuChill) jujuCount++;
+    gearFRValues.push(buffs.gearFrostResist);
+  }
+  console.log(`Players with FR buffs at fight start: Aura=${auraCount}, MotW=${motwCount}, Juju=${jujuCount}`);
+  console.log(`Gear FR values: min=${Math.min(...gearFRValues)}, max=${Math.max(...gearFRValues)}, avg=${Math.round(gearFRValues.reduce((a, b) => a + b, 0) / gearFRValues.length)}`);
+  console.log('=== END COMBATANT INFO FR + GEAR DETECTION ===');
+
+  return playerBuffs;
 }
 
 // Fetch players who had flask buffs active during the raid
@@ -417,67 +528,82 @@ export interface FrostAuraDamage {
   estimatedFrostResist: number; // Calculated FR
 }
 
-// Calculate frost resistance from resist percentage
-// Classic ERA formula appears to be: Resist% = FR / 315 (without 0.75 factor)
-// Rearranged: FR = Resist% × 315
-// This gives EFFECTIVE FR (includes all buffs like aura, MotW, consumables)
-const FR_MULTIPLIER = 315;
+// Calculate frost resistance using partial resist distribution analysis
+// In Classic WoW, spell damage can be resisted by 0%, 25%, 50%, 75%, or 100%
+// The distribution of these partial resists depends on FR
+// By analyzing the distribution, we can back-calculate exact gear FR
 
-// FR buff spell IDs and their bonuses (only subtract raid-wide buffs, not consumables)
-const FR_BUFFS = {
-  // Frost Resistance Aura (Paladin) - all ranks give +60 in Classic
-  frostResistanceAura: {
-    spellIds: [19888, 19897, 19898],
-    bonus: 60,
-  },
-  // Mark of the Wild / Gift of the Wild - +20 all resistances at max rank
-  markOfTheWild: {
-    spellIds: [
-      9885,  // MotW Rank 7 (+20 res)
-      21850, // GotW Rank 2 (+20 res)
-      9884,  // MotW Rank 6 (+15 res) - we'll use 20 as approximation
-      21849, // GotW Rank 1 (+12 res)
-    ],
-    bonus: 20,
-  },
-};
+// Expected partial resist probabilities based on average resist (AR = FR/315)
+// Uses triangular distribution model from Classic WoW mechanics
+function getExpectedDistribution(fr: number): number[] {
+  const ar = Math.min(fr / 315, 0.75); // Average resist capped at 75%
 
-interface PlayerBuffs {
-  hadFrostAura: boolean;
-  hadMotW: boolean;
+  // Partial resist buckets: 0%, 25%, 50%, 75%, 100%
+  // Distribution follows triangular pattern around AR
+  const buckets = [0, 0.25, 0.5, 0.75, 1.0];
+  const probs: number[] = [];
+
+  for (const bucket of buckets) {
+    // Triangular distribution: probability decreases linearly from AR
+    // P(x) = max(0, 0.5 - 2*|x - AR|) for 25% increments
+    let prob = Math.max(0, 0.5 - 2 * Math.abs(bucket - ar));
+
+    // 100% resists (full resist) are rare - cap at low probability
+    if (bucket === 1.0) {
+      prob = Math.min(prob, 0.05);
+    }
+
+    probs.push(prob);
+  }
+
+  // Normalize to sum to 1
+  const sum = probs.reduce((a, b) => a + b, 0);
+  return sum > 0 ? probs.map(p => p / sum) : [1, 0, 0, 0, 0];
 }
 
-function calculateFrostResist(resistPercent: number, buffs: PlayerBuffs): number {
-  // Floor at 0, cap at 75% resist (theoretical max)
-  const cappedResist = Math.max(0, Math.min(resistPercent, 0.75));
-  const effectiveFR = Math.round(cappedResist * FR_MULTIPLIER);
+// Calculate FR from observed partial resist distribution
+function calculateFrostResistFromDistribution(resistCounts: number[]): number {
+  const total = resistCounts.reduce((a, b) => a + b, 0);
+  if (total === 0) return 0;
 
-  // Subtract raid-wide buff contributions (not consumables like Juju Chill)
-  let buffBonus = 0;
-  if (buffs.hadFrostAura) buffBonus += FR_BUFFS.frostResistanceAura.bonus;
-  if (buffs.hadMotW) buffBonus += FR_BUFFS.markOfTheWild.bonus;
+  // Normalize observed distribution
+  const observed = resistCounts.map(c => c / total);
 
-  return Math.max(0, effectiveFR - buffBonus);
-}
+  // Find FR that best matches observed distribution (0 to 315)
+  let bestFR = 0;
+  let bestError = Infinity;
 
-// Query to get buff events for specific abilities
-const GET_BUFF_EVENTS = `
-query GetBuffEvents($code: String!, $fightIDs: [Int]!, $startTime: Float!, $endTime: Float!) {
-  reportData {
-    report(code: $code) {
-      events(fightIDs: $fightIDs, dataType: Buffs, hostilityType: Friendlies, startTime: $startTime, endTime: $endTime, limit: 10000) {
-        data
-        nextPageTimestamp
-      }
+  for (let fr = 0; fr <= 315; fr++) {
+    const expected = getExpectedDistribution(fr);
+
+    // Calculate sum of squared errors
+    let error = 0;
+    for (let i = 0; i < 5; i++) {
+      error += Math.pow(observed[i] - expected[i], 2);
+    }
+
+    if (error < bestError) {
+      bestError = error;
+      bestFR = fr;
     }
   }
+
+  return bestFR;
 }
-`;
+
+
+// FR buff values for subtraction from gear FR calculation
+// Note: Juju Chill is NOT subtracted - it's a player choice consumable
+const FR_BUFF_VALUES = {
+  frostResistanceAura: 60,
+  markOfTheWild: 20,
+};
 
 // Fetch frost aura damage events and calculate resistance per player
 export async function fetchFrostAuraDamage(
   code: string,
-  fightIDs: number[]
+  fightIDs: number[],
+  playerFRBuffs: Map<number, PlayerFRBuffs>
 ): Promise<FrostAuraDamage[]> {
   interface DamageEvent {
     timestamp: number;
@@ -488,14 +614,7 @@ export async function fetchFrostAuraDamage(
     amount: number;
     unmitigatedAmount?: number;
     resisted?: number;
-    hitType: number; // 0 = miss, 1 = normal, etc.
-  }
-
-  interface BuffEvent {
-    timestamp: number;
-    type: string;
-    targetID: number;
-    abilityGameID: number;
+    hitType: number;
   }
 
   interface Actor {
@@ -504,76 +623,42 @@ export async function fetchFrostAuraDamage(
     type: string;
   }
 
-  // Fetch damage events and buff events in parallel
-  const [damageResult, buffResult] = await Promise.all([
-    graphqlRequest<{
-      reportData: {
-        report: {
-          events: {
-            data: DamageEvent[];
-            nextPageTimestamp: number | null;
-          };
-          masterData: {
-            actors: Actor[];
-          };
+  // Fetch damage events only (buff detection now comes from combatant info)
+  const damageResult = await graphqlRequest<{
+    reportData: {
+      report: {
+        events: {
+          data: DamageEvent[];
+          nextPageTimestamp: number | null;
+        };
+        masterData: {
+          actors: Actor[];
         };
       };
-    }>(GET_DAMAGE_EVENTS, {
-      code,
-      fightIDs,
-      startTime: 0,
-      endTime: 999999999,
-    }),
-    graphqlRequest<{
-      reportData: {
-        report: {
-          events: {
-            data: BuffEvent[];
-            nextPageTimestamp: number | null;
-          };
-        };
-      };
-    }>(GET_BUFF_EVENTS, {
-      code,
-      fightIDs,
-      startTime: 0,
-      endTime: 999999999,
-    }),
-  ]);
+    };
+  }>(GET_DAMAGE_EVENTS, {
+    code,
+    fightIDs,
+    startTime: 0,
+    endTime: 999999999,
+  });
 
   const allEvents = damageResult.reportData.report.events?.data || [];
   const actors = damageResult.reportData.report.masterData?.actors || [];
   const actorMap = new Map(actors.map((a) => [a.id, a]));
-
-  // Find players who had FR-related buffs at any point
-  const buffEvents = buffResult.reportData.report.events?.data || [];
-  const playersWithFrostAura = new Set<number>();
-  const playersWithMotW = new Set<number>();
-
-  for (const event of buffEvents) {
-    const spellId = event.abilityGameID;
-    const targetId = event.targetID;
-
-    if (FR_BUFFS.frostResistanceAura.spellIds.includes(spellId)) {
-      playersWithFrostAura.add(targetId);
-    }
-    if (FR_BUFFS.markOfTheWild.spellIds.includes(spellId)) {
-      playersWithMotW.add(targetId);
-    }
-  }
-
-  console.log(`FR Buff detection: ${playersWithFrostAura.size} with Aura, ${playersWithMotW.size} with MotW`);
 
   // Filter to Frost Aura damage events
   // 348191 = Frost Aura in Classic ERA Naxxramas
   const FROST_AURA_SPELL_ID = 348191;
   const events = allEvents.filter((e) => e.abilityGameID === FROST_AURA_SPELL_ID);
 
-  // Aggregate per player
+  // Aggregate per player - track partial resist distribution
   const playerStats = new Map<number, {
     totalDamage: number;
     totalUnmitigated: number;
     tickCount: number;
+    // Partial resist counts: [0%, 25%, 50%, 75%, 100%]
+    resistCounts: number[];
   }>();
 
   for (const event of events) {
@@ -587,6 +672,7 @@ export async function fetchFrostAuraDamage(
       totalDamage: 0,
       totalUnmitigated: 0,
       tickCount: 0,
+      resistCounts: [0, 0, 0, 0, 0],
     };
 
     const damage = event.amount || 0;
@@ -596,31 +682,49 @@ export async function fetchFrostAuraDamage(
     existing.totalUnmitigated += unmitigated;
     existing.tickCount += 1;
 
+    // Calculate resist percentage for this event and bucket it
+    if (unmitigated > 0) {
+      const resistPct = (unmitigated - damage) / unmitigated;
+      // Round to nearest 25% bucket: 0, 0.25, 0.5, 0.75, 1.0
+      const bucketIndex = Math.min(4, Math.max(0, Math.round(resistPct * 4)));
+      existing.resistCounts[bucketIndex]++;
+    }
+
     playerStats.set(targetId, existing);
   }
 
-  // Calculate frost resistance for each player
+  // Get frost resistance for each player - use exact gear FR from item database
   const results: FrostAuraDamage[] = [];
 
   for (const [playerId, stats] of playerStats) {
     const actor = actorMap.get(playerId);
     if (!actor || stats.tickCount === 0) continue;
 
-    const resistPercent = stats.totalUnmitigated > 0
-      ? (stats.totalUnmitigated - stats.totalDamage) / stats.totalUnmitigated
-      : 0;
-
-    const buffs: PlayerBuffs = {
-      hadFrostAura: playersWithFrostAura.has(playerId),
-      hadMotW: playersWithMotW.has(playerId),
+    // Get exact gear FR from combatant info (uses item database lookup)
+    const buffs = playerFRBuffs.get(playerId) || {
+      sourceID: playerId,
+      hasFrostAura: false,
+      hasMotW: false,
+      hasJujuChill: false,
+      gearFrostResist: 0
     };
-    const estimatedFR = calculateFrostResist(resistPercent, buffs);
+
+    // Use exact gear FR from item database
+    const gearFR = buffs.gearFrostResist;
+
+    // Also calculate estimated FR from damage for comparison/debugging
+    const estimatedEffectiveFR = calculateFrostResistFromDistribution(stats.resistCounts);
+    let buffTotal = 0;
+    if (buffs.hasFrostAura) buffTotal += FR_BUFF_VALUES.frostResistanceAura;
+    if (buffs.hasMotW) buffTotal += FR_BUFF_VALUES.markOfTheWild;
+    const estimatedGearFR = Math.max(0, estimatedEffectiveFR - buffTotal);
 
     const buffList = [
-      buffs.hadFrostAura && 'Aura',
-      buffs.hadMotW && 'MotW',
+      buffs.hasFrostAura && 'Aura',
+      buffs.hasMotW && 'MotW',
     ].filter(Boolean).join('+') || 'none';
-    console.log(`${actor.name}: ${(resistPercent * 100).toFixed(1)}% resist, buffs=[${buffList}], ~${estimatedFR} FR`);
+
+    console.log(`${actor.name}: gearFR=${gearFR} (from items), estimated=${estimatedGearFR} (from dmg), buffs=[${buffList}]`);
 
     results.push({
       playerId,
@@ -629,22 +733,31 @@ export async function fetchFrostAuraDamage(
       totalDamage: stats.totalDamage,
       totalUnmitigated: stats.totalUnmitigated,
       tickCount: stats.tickCount,
-      estimatedFrostResist: estimatedFR,
+      estimatedFrostResist: gearFR, // Now using exact gear FR from items
     });
   }
 
   return results;
 }
 
-// Get Sapphiron fight IDs from a report (including wipes)
-export async function getSapphironFightIds(code: string): Promise<number[]> {
+export interface SapphironFightInfo {
+  ids: number[];
+  fightTimes: { startTime: number; endTime: number }[]; // Individual fight time ranges
+  totalFightTime: number; // Sum of individual fight durations (excludes gaps)
+}
+
+// Get Sapphiron fight IDs and time range from a report (including wipes)
+export async function getSapphironFightIds(code: string): Promise<SapphironFightInfo> {
   interface FightEntry {
     id: number;
     name: string;
     kill: boolean;
     encounterID: number;
+    startTime: number;
+    endTime: number;
   }
 
+  // Query ALL fights (including wipes)
   const result = await graphqlRequest<{
     reportData: {
       report: {
@@ -653,15 +766,30 @@ export async function getSapphironFightIds(code: string): Promise<number[]> {
     };
   }>(GET_ALL_FIGHTS, { code });
 
-  const fights = result.reportData.report.fights || [];
+  const allFights = result.reportData.report.fights || [];
 
   // Find Sapphiron fights (kills or wipes)
-  const sapphironFights = fights.filter((f) =>
+  const sapphironFights = allFights.filter((f) =>
     f.name.toLowerCase().includes('sapphiron')
   );
 
-  console.log('All fights from GET_ALL_FIGHTS:', fights.map(f => ({ id: f.id, name: f.name, kill: f.kill })));
+  console.log('All fights:', allFights.map(f => ({ id: f.id, name: f.name, kill: f.kill })));
   console.log('Sapphiron fights found:', sapphironFights);
 
-  return sapphironFights.map((f) => f.id);
+  if (sapphironFights.length === 0) {
+    return { ids: [], fightTimes: [], totalFightTime: 0 };
+  }
+
+  // Individual fight time ranges
+  const fightTimes = sapphironFights.map(f => ({ startTime: f.startTime, endTime: f.endTime }));
+  // Actual fight time = sum of individual fight durations (excludes gaps between attempts)
+  const totalFightTime = sapphironFights.reduce((sum, f) => sum + (f.endTime - f.startTime), 0);
+
+  console.log('Sapphiron fights:', fightTimes, 'totalFightTime:', totalFightTime);
+
+  return {
+    ids: sapphironFights.map((f) => f.id),
+    fightTimes,
+    totalFightTime,
+  };
 }

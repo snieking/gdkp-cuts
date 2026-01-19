@@ -17,6 +17,8 @@ import {
   fetchFrostAuraDamage,
   fetchFlaskBuffs,
   getSapphironFightIds,
+  fetchCombatantInfo,
+  fetchCombatantInfoEvents,
   FrostAuraDamage,
 } from './api/warcraftlogs';
 import { autoDetectBonuses } from './utils/parsing';
@@ -130,15 +132,27 @@ function App() {
       console.log('Raid type:', data.raidType);
 
       if (data.raidType === 'naxxramas') {
-        console.log('Fetching Sapphiron fight IDs...');
-        const sapphironFightIds = await getSapphironFightIds(data.code);
-        console.log('Sapphiron fight IDs (including wipes):', sapphironFightIds);
+        console.log('Finding Sapphiron fights...');
+        const sapphironInfo = await getSapphironFightIds(data.code);
+        console.log('Sapphiron info:', sapphironInfo);
 
         // Fetch frost aura damage if Sapphiron exists
-        if (sapphironFightIds.length > 0) {
-          console.log('Fetching frost aura damage for fights:', sapphironFightIds);
+        if (sapphironInfo.ids.length > 0) {
+          console.log('Fetching frost aura damage for fights:', sapphironInfo.ids);
           try {
-            frostAuraDamage = await fetchFrostAuraDamage(data.code, sapphironFightIds);
+            // Fetch combatant info events to detect FR buffs at fight start
+            const playerFRBuffs = await fetchCombatantInfoEvents(data.code, sapphironInfo.ids);
+
+            // Also fetch combatant info to see if WCL exposes gear FR directly
+            const combatantInfo = await fetchCombatantInfo(data.code, sapphironInfo.ids);
+            console.log('Combatant info with FR:', combatantInfo.filter(c => c.frostResistance > 0));
+
+            // Calculate gear FR from frost aura damage, subtracting detected buffs
+            frostAuraDamage = await fetchFrostAuraDamage(
+              data.code,
+              sapphironInfo.ids,
+              playerFRBuffs
+            );
             console.log('Frost aura damage result:', frostAuraDamage);
           } catch (err) {
             console.error('Error fetching frost aura damage:', err);

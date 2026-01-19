@@ -27,7 +27,7 @@ function getPlayerClass(players: Player[], playerId: number): string | null {
 // Rule: Physical DPS taking excessive frost aura damage on Sapphiron
 const physicalDpsFrostResistRule: DeductionRule = {
   id: 'physical-dps-frost-resist',
-  name: 'Frost Aura Damage (Physical DPS)',
+  name: 'Frost Resistance (Physical DPS Sapphiron)',
   description: 'Physical DPS took unexpectedly high damage from Sapphiron frost aura',
   percentage: 20,
   raidTypes: ['naxxramas'],
@@ -47,7 +47,7 @@ const physicalDpsFrostResistRule: DeductionRule = {
           playerId: frData.playerId,
           playerName: frData.playerName,
           percentage: 20,
-          reason: 'Frost Aura Damage (Physical DPS)',
+          reason: 'Frost Resistance (Physical DPS)',
           details: `~${frData.estimatedFrostResist} FR`,
         });
       }
@@ -60,7 +60,7 @@ const physicalDpsFrostResistRule: DeductionRule = {
 // Rule: Caster DPS taking excessive frost aura damage on Sapphiron
 const casterDpsFrostResistRule: DeductionRule = {
   id: 'caster-dps-frost-resist',
-  name: 'Frost Aura Damage (Caster DPS)',
+  name: 'Frost Resistance (Caster DPS Sapphiron)',
   description: 'Caster DPS resisted unexpectedly little from Sapphiron frost aura',
   percentage: 20,
   raidTypes: ['naxxramas'],
@@ -80,7 +80,7 @@ const casterDpsFrostResistRule: DeductionRule = {
           playerId: frData.playerId,
           playerName: frData.playerName,
           percentage: 20,
-          reason: 'Frost Aura Damage (Caster DPS)',
+          reason: 'Frost Resistance (Caster DPS)',
           details: `~${frData.estimatedFrostResist} FR`,
         });
       }
