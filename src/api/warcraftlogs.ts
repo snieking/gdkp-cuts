@@ -240,6 +240,23 @@ export async function fetchReportData(code: string): Promise<ReportData> {
     throw new Error(`Unsupported zone: ${zones.join(', ')}. Only Naxxramas and World Tour (AQ40/BWL/MC) are supported.`);
   }
 
+  // Extract table data
+  const damageDone = damageDoneResult.reportData.report.table?.data?.entries || [];
+  const healingDone = healingDoneResult.reportData.report.table?.data?.entries || [];
+  const damageTaken = damageTakenResult.reportData.report.table?.data?.entries || [];
+
+  // Filter players to only those who participated in boss fights
+  // (appear in damage done, healing done, or damage taken tables)
+  const participantIds = new Set<number>();
+  for (const entry of damageDone) participantIds.add(entry.id);
+  for (const entry of healingDone) participantIds.add(entry.id);
+  for (const entry of damageTaken) participantIds.add(entry.id);
+
+  const allActors = report.masterData.actors;
+  const raidParticipants = allActors.filter((p) => participantIds.has(p.id));
+
+  console.log(`Players: ${allActors.length} in log, ${raidParticipants.length} participated in fights`);
+
   return {
     code,
     zone: report.zone,
@@ -248,10 +265,10 @@ export async function fetchReportData(code: string): Promise<ReportData> {
     startTime,
     endTime,
     fights: report.fights,
-    players: report.masterData.actors,
-    damageDone: damageDoneResult.reportData.report.table?.data?.entries || [],
-    healingDone: healingDoneResult.reportData.report.table?.data?.entries || [],
-    damageTaken: damageTakenResult.reportData.report.table?.data?.entries || [],
+    players: raidParticipants,
+    damageDone,
+    healingDone,
+    damageTaken,
     buffs: buffsResult.reportData.report.table?.data?.auras || [],
     debuffs: debuffsResult.reportData.report.table?.data?.auras || [],
     dispels: dispelsResult.reportData.report.table?.data?.entries || [],
