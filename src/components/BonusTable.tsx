@@ -9,10 +9,10 @@ interface Props {
   onAssignmentChange: (bonusId: string, playerId: number | null, playerName: string | null) => void;
 }
 
-// Manual first to emphasize required user input
+// Manual first to draw attention
 const CATEGORY_ORDER: BonusCategory[] = ['manual', 'tank', 'dps', 'healer', 'debuff', 'utility'];
 const CATEGORY_LABELS: Record<BonusCategory, string> = {
-  manual: 'Manual Entry Required',
+  manual: 'Manual Attention',
   tank: 'Tank Bonuses',
   dps: 'DPS Bonuses',
   healer: 'Healer Bonuses',
@@ -20,7 +20,7 @@ const CATEGORY_LABELS: Record<BonusCategory, string> = {
   utility: 'Utility Bonuses',
 };
 const CATEGORY_NOTES: Partial<Record<BonusCategory, string>> = {
-  manual: 'These bonuses cannot be auto-detected. Please assign manually.',
+  manual: 'Cannot be auto-detected. Assign if applicable, or leave empty.',
   tank: 'Auto-detected from damage taken. Verify assignments.',
 };
 const CATEGORY_COLORS: Record<BonusCategory, string> = {
@@ -91,11 +91,7 @@ export function BonusTable({ assignments, players, totalPot, raidType, onAssignm
                             <select
                               value={assignment?.playerId?.toString() || ''}
                               onChange={(e) => handlePlayerSelect(bonus.id, e)}
-                              className={`flex-1 rounded-md border text-white text-sm px-2 py-1 focus:ring-2 focus:ring-blue-500 ${
-                                bonus.category === 'manual' && !assignment?.playerId
-                                  ? 'bg-yellow-900/30 border-yellow-600'
-                                  : 'bg-gray-700 border-gray-600'
-                              }`}
+                              className="flex-1 rounded-md bg-gray-700 border-gray-600 text-white text-sm px-2 py-1 border focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="">-- Select --</option>
                               {[...players].sort((a, b) => a.name.localeCompare(b.name)).map((p) => (
@@ -108,11 +104,6 @@ export function BonusTable({ assignments, players, totalPot, raidType, onAssignm
                             {assignment?.autoDetected && (
                               <span className="text-xs px-2 py-0.5 bg-green-900/50 text-green-400 rounded">
                                 Auto
-                              </span>
-                            )}
-                            {bonus.category === 'manual' && !assignment?.playerId && (
-                              <span className="text-xs px-2 py-0.5 bg-yellow-900/50 text-yellow-400 rounded">
-                                Required
                               </span>
                             )}
                           </div>
