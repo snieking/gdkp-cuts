@@ -3,7 +3,6 @@ import { ReportInput } from './components/ReportInput';
 import { ConfigPanel } from './components/ConfigPanel';
 import { BonusTable } from './components/BonusTable';
 import { DeductionsPanel } from './components/DeductionsPanel';
-import { SuggestedDeductionsPanel } from './components/SuggestedDeductionsPanel';
 import { PlayerSummary } from './components/PlayerSummary';
 import { ExportPanel } from './components/ExportPanel';
 import {
@@ -12,19 +11,10 @@ import {
   handleCallback,
   clearAuth,
 } from './api/auth';
-import {
-  fetchReportData,
-  fetchFrostAuraDamage,
-  fetchFlaskBuffs,
-  getSapphironFightIds,
-  fetchCombatantInfo,
-  fetchCombatantInfoEvents,
-  FrostAuraDamage,
-} from './api/warcraftlogs';
+import { fetchReportData } from './api/warcraftlogs';
 import { autoDetectBonuses } from './utils/parsing';
 import { calculateCuts, CalculationResult } from './utils/calculations';
-import { runDeductionRules, DeductionRuleContext } from './utils/deductionRules';
-import { ReportData, Config, BonusAssignment, Deduction, SuggestedDeduction } from './types';
+import { ReportData, Config, BonusAssignment, Deduction } from './types';
 
 const DEFAULT_CONFIG: Config = {
   totalPot: 0,
@@ -49,8 +39,6 @@ function App() {
   const [assignments, setAssignments] = useState<BonusAssignment[]>([]);
   const [deductions, setDeductions] = useState<Deduction[]>([]);
   const [result, setResult] = useState<CalculationResult | null>(null);
-  const [suggestedDeductions, setSuggestedDeductions] = useState<SuggestedDeduction[]>([]);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const pendingShareData = useRef<ShareData | null>(null);
 
   // Check auth on mount and handle callback
@@ -120,74 +108,9 @@ function App() {
     setResult(null);
   };
 
-  // Fetch data for suggested deductions
-  const fetchSuggestionData = useCallback(async (data: ReportData) => {
-    setSuggestionsLoading(true);
-    setSuggestedDeductions([]);
-
-    try {
-      // Get Sapphiron fight IDs for frost resist check (Naxx only, includes wipes)
-      let frostAuraDamage: FrostAuraDamage[] = [];
-      console.log('=== SUGGESTION DATA FETCH START ===');
-      console.log('Raid type:', data.raidType);
-
-      if (data.raidType === 'naxxramas') {
-        console.log('Finding Sapphiron fights...');
-        const sapphironInfo = await getSapphironFightIds(data.code);
-        console.log('Sapphiron info:', sapphironInfo);
-
-        // Fetch frost aura damage if Sapphiron exists
-        if (sapphironInfo.ids.length > 0) {
-          console.log('Fetching frost aura damage for fights:', sapphironInfo.ids);
-          try {
-            // Fetch combatant info events to detect FR buffs at fight start
-            const playerFRBuffs = await fetchCombatantInfoEvents(data.code, sapphironInfo.ids);
-
-            // Also fetch combatant info to see if WCL exposes gear FR directly
-            const combatantInfo = await fetchCombatantInfo(data.code, sapphironInfo.ids);
-            console.log('Combatant info with FR:', combatantInfo.filter(c => c.frostResistance > 0));
-
-            // Calculate gear FR from frost aura damage, subtracting detected buffs
-            frostAuraDamage = await fetchFrostAuraDamage(
-              data.code,
-              sapphironInfo.ids,
-              playerFRBuffs
-            );
-            console.log('Frost aura damage result:', frostAuraDamage);
-          } catch (err) {
-            console.error('Error fetching frost aura damage:', err);
-          }
-        } else {
-          console.log('No Sapphiron fight found in report');
-        }
-      } else {
-        console.log('Skipping frost resist check - not Naxxramas');
-      }
-
-      // Fetch flask buff data
-      const flaskBuffs = await fetchFlaskBuffs(data.code, data.startTime, data.endTime);
-
-      // Build context and run rules
-      const ctx: DeductionRuleContext = {
-        players: data.players,
-        frostAuraDamage,
-        flaskBuffs,
-        raidType: data.raidType,
-      };
-
-      const suggestions = runDeductionRules(ctx);
-      setSuggestedDeductions(suggestions);
-    } catch (err) {
-      console.error('Failed to fetch suggestion data:', err);
-    } finally {
-      setSuggestionsLoading(false);
-    }
-  }, []);
-
   const handleLoadReport = useCallback(async (code: string, shareData?: ShareData) => {
     setLoading(true);
     setError(null);
-    setSuggestedDeductions([]);
 
     try {
       const data = await fetchReportData(code);
@@ -238,15 +161,12 @@ function App() {
         setAssignments(detected);
         setDeductions([]);
       }
-
-      // Fetch suggestion data in background
-      fetchSuggestionData(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load report');
     } finally {
       setLoading(false);
     }
-  }, [fetchSuggestionData]);
+  }, []);
 
   const handleAssignmentChange = (
     bonusId: string,
@@ -352,14 +272,6 @@ function App() {
               totalPot={config.totalPot}
               raidType={reportData.raidType}
               onAssignmentChange={handleAssignmentChange}
-            />
-
-            {/* Suggested Deductions */}
-            <SuggestedDeductionsPanel
-              suggestions={suggestedDeductions}
-              existingDeductions={deductions}
-              onApply={handleAddDeduction}
-              loading={suggestionsLoading}
             />
 
             {/* Deductions */}
