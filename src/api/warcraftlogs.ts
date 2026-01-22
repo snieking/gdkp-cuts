@@ -8,6 +8,7 @@ import {
   GET_DEBUFFS,
   GET_DISPELS,
   GET_CASTS_BY_TIME,
+  GET_FIGHT_PARTICIPANTS,
 } from './queries';
 import {
   ReportData,
@@ -237,17 +238,49 @@ export async function fetchReportData(code: string): Promise<ReportData> {
   const healingDone = healingDoneResult.reportData.report.table?.data?.entries || [];
   const damageTaken = damageTakenResult.reportData.report.table?.data?.entries || [];
 
-  // Filter players to only those who participated in boss fights
-  // (appear in damage done, healing done, or damage taken tables)
-  const participantIds = new Set<number>();
-  for (const entry of damageDone) participantIds.add(entry.id);
-  for (const entry of healingDone) participantIds.add(entry.id);
-  for (const entry of damageTaken) participantIds.add(entry.id);
+  // Track participation per fight to filter out alts/reloggers
+  const totalFights = report.fights.length;
+  const playerFightCount = new Map<number, number>();
 
+  // Query each fight for participants (in parallel, batched)
+  const fightParticipantResults = await Promise.all(
+    report.fights.map((fight) =>
+      graphqlRequest<{ reportData: { report: { table: { data: { entries: RankingEntry[] } } } } }>(
+        GET_FIGHT_PARTICIPANTS,
+        { code, fightIDs: [fight.id] }
+      )
+    )
+  );
+
+  // Count fights per player
+  for (const result of fightParticipantResults) {
+    const entries = result.reportData.report.table?.data?.entries || [];
+    for (const entry of entries) {
+      playerFightCount.set(entry.id, (playerFightCount.get(entry.id) || 0) + 1);
+    }
+  }
+
+  // Filter players to only those who participated in majority (>50%) of boss fights
+  const majorityThreshold = Math.ceil(totalFights / 2);
   const allActors = report.masterData.actors;
-  const raidParticipants = allActors.filter((p) => participantIds.has(p.id));
+  const raidParticipants = allActors.filter((p) => {
+    const fightCount = playerFightCount.get(p.id) || 0;
+    return fightCount >= majorityThreshold;
+  });
 
-  console.log(`Players: ${allActors.length} in log, ${raidParticipants.length} participated in fights`);
+  // Log participation stats
+  const excluded = allActors.filter((p) => {
+    const fightCount = playerFightCount.get(p.id) || 0;
+    return fightCount > 0 && fightCount < majorityThreshold;
+  });
+  console.log(`Fights: ${totalFights}, majority threshold: ${majorityThreshold}`);
+  console.log(`Players: ${allActors.length} in log, ${raidParticipants.length} eligible (>50% participation)`);
+  if (excluded.length > 0) {
+    console.log(`Excluded (partial participation):`, excluded.map((p) => {
+      const count = playerFightCount.get(p.id) || 0;
+      return `${p.name} (${count}/${totalFights})`;
+    }));
+  }
 
   return {
     code,

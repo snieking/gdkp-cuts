@@ -99,3 +99,14 @@ query GetCastsByTime($code: String!, $startTime: Float!, $endTime: Float!, $abil
   }
 }
 `;
+
+// Get damage done for a specific fight (to track participation)
+export const GET_FIGHT_PARTICIPANTS = `
+query GetFightParticipants($code: String!, $fightIDs: [Int]!) {
+  reportData {
+    report(code: $code) {
+      table(dataType: DamageDone, fightIDs: $fightIDs)
+    }
+  }
+}
+`;
